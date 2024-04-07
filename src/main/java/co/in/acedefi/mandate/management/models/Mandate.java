@@ -57,6 +57,14 @@ private long amount;
 private MandateType type;
 
 @Property()
+@JsonProperty("utilization")
+private long utilization;
+
+@Property()
+@JsonProperty("lastTransactionDate")
+private String lastTransactionDate;
+
+@Property()
 @JsonProperty("frequency")
 private MandateFrequency frequency;
 
@@ -77,7 +85,9 @@ public Mandate(@JsonProperty("accountNumber") final String accountNumber,
         @JsonProperty("uniqueMandateReferenceNumber") final String uniqueMandateReferenceNumber, 
         @JsonProperty("mandateExpiry") final String mandateExpiry, 
         @JsonProperty("amount") final long amount, 
+        @JsonProperty("utilization") final long utilization,
         @JsonProperty("type") final MandateType type,
+        @JsonProperty("lastTransactionDate") final String lastTransactionDate,
         @JsonProperty("frequency") final MandateFrequency frequency,
         @JsonProperty("customerName") final String customerName,
         @JsonProperty("customerId") final String customerId, 
@@ -88,13 +98,13 @@ public Mandate(@JsonProperty("accountNumber") final String accountNumber,
             this.uniqueMandateReferenceNumber = uniqueMandateReferenceNumber;
             this.mandateExpiry = mandateExpiry;
             this.amount = amount;
+            this.utilization=utilization;
+            this.lastTransactionDate=lastTransactionDate;
             this.type=type;
             this.frequency = frequency;
             this.customerName=customerName;
             this.customerId=customerId;
             this.purposeCode=purposeCode;
-
-
     }
 
     public static Mandate fromJSONString(final String data) {
@@ -105,7 +115,9 @@ public Mandate(@JsonProperty("accountNumber") final String accountNumber,
             json.getString("uniqueMandateReferenceNumber"), 
             json.getString("mandateExpiry"), 
             Long.valueOf(json.getString("amount")), 
+            Long.valueOf(json.getString("utilization")), 
             MandateType.valueOf(json.getString("type")),
+            json.getString("lastTransactionDate"),
             MandateFrequency.valueOf(json.getString("frequency")),
             json.getString("customerName"),
             json.getString("customerId"), 

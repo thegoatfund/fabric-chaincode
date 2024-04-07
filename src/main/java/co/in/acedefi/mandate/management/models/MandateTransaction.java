@@ -26,7 +26,7 @@ date
 @Getter
 @Setter
 @DataType()
-public class Transaction {
+public class MandateTransaction {
 
     @Property()
     @JsonProperty()
@@ -48,7 +48,7 @@ public class Transaction {
     @JsonProperty("date")
     private String date;
 
-    public Transaction(@JsonProperty("fromAccount") final String fromAccount, 
+    public MandateTransaction(@JsonProperty("fromAccount") final String fromAccount, 
         @JsonProperty("uniqueMandateReferenceNumber") final String uniqueMandateReferenceNumber, 
         @JsonProperty("purposeCode") final PurposeCode purposeCode, 
         @JsonProperty("amount") final long amount,
@@ -61,9 +61,9 @@ public class Transaction {
             this.date = date;
     }
 
-    public static Transaction fromJSONString(final String data) {
+    public static MandateTransaction fromJSONString(final String data) {
         final JSONObject json = new JSONObject(data);
-        final Transaction transaction = new Transaction(
+        final MandateTransaction transaction = new MandateTransaction(
             json.getString("fromAccount"),
             json.getString("uniqueMandateReferenceNumber"),
             PurposeCode.valueOf(json.getString("purposeCode")),
@@ -72,8 +72,8 @@ public class Transaction {
         return transaction;
     }
 
-    public static Transaction fromBytes(final byte[] bytes) {
-        return new Genson().deserialize(new String(bytes, UTF_8), Transaction.class);
+    public static MandateTransaction fromBytes(final byte[] bytes) {
+        return new Genson().deserialize(new String(bytes, UTF_8), MandateTransaction.class);
     }
 
     public String toJSONString() {

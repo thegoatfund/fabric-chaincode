@@ -25,4 +25,10 @@ public final class MandateUtils {
         }
         return false;
     }
+
+    public static boolean longIsNullOrZero(final Long number) {
+        return number == null || number == 0;
+      }
+
+    
 }
