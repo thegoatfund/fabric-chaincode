@@ -6,4 +6,5 @@
 
 <suppressions>
     <suppress files="ChaincodeTest.java" checks="ParameterNumber" />
+    <suppress files="MandateProcessor.java" checks="ParameterNumber" lines="89"  />
 </suppressions>

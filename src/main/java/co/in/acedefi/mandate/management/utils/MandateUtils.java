@@ -7,7 +7,7 @@ public final class MandateUtils {
     private MandateUtils() {
 
     }
-  
+
     /**
      * @param string
      * @return
@@ -18,8 +18,8 @@ public final class MandateUtils {
 
     public static boolean stringinListIsNullOrEmpty(final List<String> stringList) {
 
-        for (String string : stringList){
-            if (stringIsNullOrEmpty(string)){
+        for (String string : stringList) {
+            if (stringIsNullOrEmpty(string)) {
                 return true;
             }
         }
@@ -30,5 +30,5 @@ public final class MandateUtils {
         return number == null || number == 0;
       }
 
-    
+
 }
