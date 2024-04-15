@@ -18,6 +18,9 @@ public final class MandateUtils {
 
     public static boolean stringinListIsNullOrEmpty(final List<String> stringList) {
 
+        if (stringList == null) {
+            return true;
+        }
         for (String string : stringList) {
             if (stringIsNullOrEmpty(string)) {
                 return true;

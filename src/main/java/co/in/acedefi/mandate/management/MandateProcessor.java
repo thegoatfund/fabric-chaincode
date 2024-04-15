@@ -1,10 +1,14 @@
 package co.in.acedefi.mandate.management;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import org.hyperledger.fabric.contract.Context;
 import org.hyperledger.fabric.contract.ContractInterface;
@@ -17,6 +21,7 @@ import org.hyperledger.fabric.contract.annotation.Transaction;
 import org.hyperledger.fabric.shim.ChaincodeException;
 import org.hyperledger.fabric.shim.ChaincodeStub;
 
+import co.in.acedefi.mandate.management.enums.ContractEvents;
 import co.in.acedefi.mandate.management.enums.MandateType;
 import co.in.acedefi.mandate.management.enums.PurposeCode;
 import co.in.acedefi.mandate.management.models.Mandate;
@@ -46,10 +51,11 @@ public class MandateProcessor implements ContractInterface {
     private enum MandateErrors {
         MANDATE_NOT_FOUND,
         MANDATE_ALREADY_EXISTS,
-        INVALID_MANDATE
+        INVALID_MANDATE,
+        GENERIC_PROCESSING_ERROR
     }
 
-    private final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("dd-mm-yyyy");
+    private final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
 
 /**
  * Reads a mandate from the ledger.
@@ -61,18 +67,24 @@ public class MandateProcessor implements ContractInterface {
  * @return The retrieved mandate.
  */
     @Transaction(intent = Transaction.TYPE.EVALUATE)
-    public Mandate ReadMandate(final Context ctx, final String uniqueMandateReferenceNumber) {
+    public Mandate readMandate(final Context ctx, final String uniqueMandateReferenceNumber) {
 
-        ChaincodeStub stub = ctx.getStub();
-        String mandateJSON = stub.getStringState(uniqueMandateReferenceNumber);
+        try {
 
-        if (mandateJSON == null || mandateJSON.isEmpty()) {
-            String errorMessage = String.format("Mandate %s does not exist", uniqueMandateReferenceNumber);
-            System.out.println(errorMessage);
-            throw new ChaincodeException(errorMessage, MandateErrors.MANDATE_ALREADY_EXISTS.toString());
+            ChaincodeStub stub = ctx.getStub();
+            String mandateJSON = stub.getStringState(uniqueMandateReferenceNumber);
+
+            if (mandateJSON == null || mandateJSON.isEmpty()) {
+                String errorMessage = String.format("Mandate %s does not exist", uniqueMandateReferenceNumber);
+                System.out.println(errorMessage);
+                throw new ChaincodeException(errorMessage, MandateErrors.MANDATE_ALREADY_EXISTS.toString());
+            }
+
+            return Mandate.fromJSONString(mandateJSON);
+
+        } catch (Exception e) {
+            throw new ChaincodeException(e.getMessage(), MandateErrors.GENERIC_PROCESSING_ERROR.toString());
         }
-
-        return Mandate.fromJSONString(mandateJSON);
 
     }
 
@@ -126,17 +138,29 @@ public class MandateProcessor implements ContractInterface {
 
     private boolean validateMandateData(final Mandate mandate) {
 
-        if (MandateUtils.stringinListIsNullOrEmpty(new ArrayList<>(Arrays.asList(mandate.getAccountNumber(),
-            mandate.getUniqueMandateReferenceNumber(), mandate.getType().toString(), mandate.getFrequency().toString(),
-            mandate.getCustomerId(), mandate.getPurposeCode().toString())))) {
+        try {
 
-                String errorMessage = "Mandatory fields like AccountNumber, UniqueMandateReferenceNumber, Mandate Type, "
-                + "Mandate Frequency, customer id and purspose code are required";
-                System.out.println(errorMessage);
-                throw new ChaincodeException(errorMessage, MandateErrors.MANDATE_ALREADY_EXISTS.toString());
+            if (MandateUtils.stringinListIsNullOrEmpty(new ArrayList<>(Arrays.asList(mandate.getAccountNumber(),
+                mandate.getUniqueMandateReferenceNumber(), mandate.getType().toString(), mandate.getFrequency().toString(),
+                mandate.getCustomerId(), mandate.getPurposeCode().toString())))) {
+
+                    String errorMessage = "Mandatory fields like AccountNumber, UniqueMandateReferenceNumber, Mandate Type, "
+                    + "Mandate Frequency, customer id and purspose code are required";
+                    System.out.println(errorMessage);
+                    throw new ChaincodeException(errorMessage, MandateErrors.INVALID_MANDATE.toString());
+            }
+            if (LocalDate.parse(mandate.getMandateExpiry(), dateTimeFormatter) == null) {
+
+                throw new ChaincodeException(printErrorString("Mandate expiry date needs to be provided ",
+                    mandate.getUniqueMandateReferenceNumber()), MandateErrors.INVALID_MANDATE.toString());
+            }
+        } catch (DateTimeParseException e) {
+
+            throw new ChaincodeException(printErrorString("Invalid date format provided in the mandate",
+                    mandate.getUniqueMandateReferenceNumber()), MandateErrors.INVALID_MANDATE.toString());
         }
         return true;
-        }
+    }
 /**
  * Checks whether a mandate exists on te input ledger
  * This method takes input as the the UMRN and validates if the mandate exists.
@@ -159,15 +183,15 @@ public class MandateProcessor implements ContractInterface {
  * @return Mandate object
  */
 
-    @Transaction(intent = Transaction.TYPE.EVALUATE)
-    public Mandate getMandate(final Context ctx, final String uniqueMandateReferenceNumber) {
+
+    private Mandate getMandate(final Context ctx, final String uniqueMandateReferenceNumber) {
         ChaincodeStub stub = ctx.getStub();
         String mandateJSON = stub.getStringState(uniqueMandateReferenceNumber);
 
         if (mandateJSON != null && !mandateJSON.isEmpty()) {
             return Mandate.fromJSONString(mandateJSON);
         }
-        return null;
+        throw new ChaincodeException("Mandate Not found", MandateErrors.MANDATE_NOT_FOUND.toString());
     }
 
     // @Transaction(intent = Transaction.TYPE.SUBMIT)
@@ -195,22 +219,28 @@ public class MandateProcessor implements ContractInterface {
         final String uniqueMandateReferenceNumber, final String purposeCode, final long amount,
         final String date) {
 
-        Mandate mandate = getMandate(ctx, uniqueMandateReferenceNumber);
-        MandateTransaction mandateTransaction = new MandateTransaction(fromAccount, uniqueMandateReferenceNumber,
-            PurposeCode.valueOf(purposeCode), amount, date);
-        if (mandate == null) {
-            // String errorMessage = String.format("Mandate %s does not exist", uniqueMandateReferenceNumber);
-            // System.out.println(errorMessage);
-            throw new ChaincodeException(printErrorString("Mandate %s does not exist", uniqueMandateReferenceNumber),
-                MandateErrors.MANDATE_NOT_FOUND.toString());
+        try {
+            System.out.println("INSIDE APPROVE TRANSACTION");
+            Mandate mandate = getMandate(ctx, uniqueMandateReferenceNumber);
+            MandateTransaction mandateTransaction = new MandateTransaction(fromAccount, uniqueMandateReferenceNumber,
+                PurposeCode.valueOf(purposeCode), amount, date);
+            if (mandate == null) {
+                // String errorMessage = String.format("Mandate %s does not exist", uniqueMandateReferenceNumber);
+                // System.out.println(errorMessage);
+                throw new ChaincodeException(printErrorString("Mandate %s does not exist", uniqueMandateReferenceNumber),
+                    MandateErrors.MANDATE_NOT_FOUND.toString());
+            }
+            if (validateUtilizationData(mandate, mandateTransaction)) {
+                updateMandate(ctx, mandate, mandateTransaction);
+                return mandateTransaction;
+            } else {
+                throw new ChaincodeException(printErrorString("Mandate Validations failed", uniqueMandateReferenceNumber),
+                    MandateErrors.INVALID_MANDATE.toString());
+            }
+        } catch (Exception e) {
+            throw new ChaincodeException(e.getMessage(), MandateErrors.GENERIC_PROCESSING_ERROR.toString());
         }
-        if (validateUtilizationData(mandate, mandateTransaction)) {
-            updateMandate(ctx, mandate, mandateTransaction);
-            return mandateTransaction;
-        } else {
-            throw new ChaincodeException(printErrorString("Mandate Validations failed", uniqueMandateReferenceNumber),
-                MandateErrors.INVALID_MANDATE.toString());
-        }
+
     }
 
     private Boolean validateUtilizationData(final Mandate mandate, final MandateTransaction mandateTransaction) {
@@ -284,7 +314,7 @@ public class MandateProcessor implements ContractInterface {
     public Mandate updateMandateUtilizationAndLastTransactionDate(final Context ctx, final String uniqueMandateReferenceNumber,
         final long transactionAmount, final String lastTransactionDate) {
 
-        Mandate mandate = ReadMandate(ctx, uniqueMandateReferenceNumber);
+        Mandate mandate = readMandate(ctx, uniqueMandateReferenceNumber);
         ChaincodeStub stub = ctx.getStub();
         mandate.setLastTransactionDate(lastTransactionDate);
         mandate.setUtilization(transactionAmount);
@@ -293,19 +323,48 @@ public class MandateProcessor implements ContractInterface {
 
     }
 
-    // @Transaction(intent = Transaction.TYPE.EVALUATE)
-    // public Transaction ReadTransaction(final Context ctx, final String transactionId) {
-
-
-    // }
-
-
     private String printErrorString(final String errorString, final Object... args) {
-        String errorMessage = String.format(errorString, args);
+            String errorMessage = String.format(errorString, args);
         System.out.println(errorMessage);
         return errorMessage;
     }
 
+/**
+ * Creates mandates in bulk
+ *
+ * This method takes input a String [] of json objects each representing a mandate, in a loop converts them to a
+ * mandate object and then puts them in the ledger
+ * @param mandateJsonArray UMRN on the mandate.
+ * @return Array of mandate objects
+ */
 
+    @Transaction(intent = Transaction.TYPE.SUBMIT)
+    public List<Mandate> batchCreateMandate(final Context ctx, final List<String> mandateJsonArray) {
+
+
+        if (MandateUtils.stringinListIsNullOrEmpty(mandateJsonArray)) {
+            throw new ChaincodeException(printErrorString("Mandate cant be null or empty ",
+                new Object()), MandateErrors.INVALID_MANDATE.toString());
+        }
+
+        List<Mandate> mandateCreatedArray = new ArrayList<Mandate>();
+        ChaincodeStub stub = ctx.getStub();
+        for (String mandateJson : mandateJsonArray) {
+            Mandate mandate = Mandate.fromJSONString(mandateJson);
+
+            try {
+                if (validateMandateData(mandate)) {
+                    stub.putStringState(mandate.getUniqueMandateReferenceNumber(), mandate.toJSONString());
+                    stub.setEvent(ContractEvents.MANDATE_CREATED.getValue(), mandate.toJSONString().getBytes(UTF_8));
+                }
+            } catch (Exception e) {
+                mandate.setType(MandateType.NOT_CREATED);
+                stub.setEvent(ContractEvents.MANDATE_CREATION_FAILED.getValue(), mandate.toJSONString().getBytes(UTF_8));
+            }
+            mandateCreatedArray.add(mandate);
+        }
+        return mandateCreatedArray;
+
+    }
 
 }
