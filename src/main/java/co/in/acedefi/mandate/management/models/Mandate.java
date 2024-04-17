@@ -10,7 +10,9 @@ import com.owlike.genson.annotation.JsonProperty;
 import co.in.acedefi.mandate.management.enums.MandateFrequency;
 import co.in.acedefi.mandate.management.enums.MandateType;
 import co.in.acedefi.mandate.management.enums.PurposeCode;
+
 import static java.nio.charset.StandardCharsets.UTF_8;
+
 
 
 
@@ -224,24 +226,46 @@ public static class Builder {
 //             this.purposeCode = purposeCode;
 //     }
 
-    public static Mandate fromJSONString(final String data) {
+    public static Mandate fromJSONString(final String data) throws Exception {
         final JSONObject json = new JSONObject(data);
-        final Mandate mandate = new Builder()
-            .accountNumber(json.getString("accountNumber"))
-            .accountIfsc(json.getString("accountIfsc"))
-            .uniqueMandateReferenceNumber(json.getString("uniqueMandateReferenceNumber"))
-            .mandateExpiry(json.getString("mandateExpiry"))
-            .amount(Long.valueOf(json.getInt("amount")))
-            .type(json.getString("type"))
-            .utilization(Long.valueOf(json.getInt("utilization")))
-            .lastTransactionDate(json.getString("lastTransactionDate"))
-            .frequency(json.getString("frequency"))
-            .merchantIdentifier(json.getString("merchantIdentifier"))
-            .customerId(json.getString("customerId"))
-            .purposeCode(json.getString("purposeCode"))
-            .build();
+        final Mandate.Builder builder = new Mandate.Builder();
 
-        return mandate;
+        for (String key : json.keySet()) {
+            switch (key) {
+                case "accountNumber":
+                case "accountIfsc":
+                case "uniqueMandateReferenceNumber":
+                case "mandateExpiry":
+                case "type":
+                case "lastTransactionDate":
+                case "frequency":
+                case "merchantIdentifier":
+                case "customerId":
+                case "purposeCode":
+                default:
+                    // Handle string fields
+                    builderField(builder, key, json.optString(key, null));
+                    break;
+                case "amount":
+                case "utilization":
+                    // Handle long fields
+                    builderField(builder, key, json.optLong(key, 0L));
+                    break;
+                // Add cases for other field types if needed
+            }
+        }
+        return builder.build();
+    }
+
+    private static void builderField(final Mandate.Builder builder, final String key, final Object value) throws Exception {
+        if (value != null) {
+            if (value instanceof String) {
+                builder.getClass().getMethod(key, String.class).invoke(builder, (String) value);
+            } else if (value instanceof Long) {
+                builder.getClass().getMethod(key, Long.TYPE).invoke(builder, (Long) value);
+            }
+            // Add additional cases for other field types as needed
+        }
     }
 
     public static Mandate fromBytes(final byte[] bytes) {

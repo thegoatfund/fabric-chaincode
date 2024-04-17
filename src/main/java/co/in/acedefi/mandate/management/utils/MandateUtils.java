@@ -3,6 +3,9 @@ package co.in.acedefi.mandate.management.utils;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 
 public final class MandateUtils {
 
@@ -49,6 +52,20 @@ public final class MandateUtils {
         }
 
         return jsonStringList;
+    }
+
+    public static String convertStringListToConcatenatedString(final List<String> inputJsonStringList) {
+
+        if (inputJsonStringList == null || inputJsonStringList.isEmpty()) {
+            return "";
+        }
+        JSONArray jsonArray = new JSONArray();
+        for (String inputString : inputJsonStringList) {
+            JSONObject jsonObject = new JSONObject(inputString);
+            jsonArray.put(jsonObject);
+        }
+        System.out.println("JSON ARRAY STRING " + jsonArray.toString());
+        return jsonArray.toString();
     }
 
 

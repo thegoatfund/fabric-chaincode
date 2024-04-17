@@ -154,6 +154,8 @@ public class MandateProcessor implements ContractInterface {
                 throw new ChaincodeException(printErrorString("Mandate expiry date needs to be provided ",
                     mandate.getUniqueMandateReferenceNumber()), MandateErrors.INVALID_MANDATE.toString());
             }
+
+
         } catch (DateTimeParseException e) {
 
             throw new ChaincodeException(printErrorString("Invalid date format provided in the mandate",
@@ -189,7 +191,13 @@ public class MandateProcessor implements ContractInterface {
         String mandateJSON = stub.getStringState(uniqueMandateReferenceNumber);
 
         if (mandateJSON != null && !mandateJSON.isEmpty()) {
-            return Mandate.fromJSONString(mandateJSON);
+            try {
+                return Mandate.fromJSONString(mandateJSON);
+            } catch (Exception e) {
+                throw new ChaincodeException(printErrorString("Error in converting json to mandate ",
+                    new Object()), MandateErrors.INVALID_MANDATE.toString());
+            }
+
         }
         throw new ChaincodeException("Mandate Not found", MandateErrors.MANDATE_NOT_FOUND.toString());
     }
@@ -339,7 +347,7 @@ public class MandateProcessor implements ContractInterface {
  */
 
     @Transaction(intent = Transaction.TYPE.SUBMIT)
-    public List<Mandate> batchCreateMandate(final Context ctx, final String mandateJsonArray) {
+    public String batchCreateMandate(final Context ctx, final String mandateJsonArray) {
 
         System.out.println("Inside Mandate Function" + mandateJsonArray);
         if (MandateUtils.stringIsNullOrEmpty(mandateJsonArray)) {
@@ -347,25 +355,37 @@ public class MandateProcessor implements ContractInterface {
                 new Object()), MandateErrors.INVALID_MANDATE.toString());
         }
 
-        List<Mandate> mandateCreatedArray = new ArrayList<Mandate>();
+        List<String> mandateCreatedList = new ArrayList<>();
         ChaincodeStub stub = ctx.getStub();
+        Mandate mandate = null;
         for (String mandateJson : MandateUtils.convertStringToList(mandateJsonArray)) {
             System.out.println("Inside for loop before mandate creation" + mandateJson);
-            Mandate mandate = Mandate.fromJSONString(mandateJson);
+            try {
+                mandate = Mandate.fromJSONString(mandateJson);
+            } catch (Exception e) {
+                throw new ChaincodeException(printErrorString("Error in converting json to mandate ",
+                    new Object()), MandateErrors.INVALID_MANDATE.toString());
+            }
+
         // for (Mandate mandate : mandateJsonArray) {
             System.out.println("Inside for loop");
             try {
-                if (validateMandateData(mandate)) {
+                if (validateMandateData(mandate) && !mandateExists(ctx, mandate.getUniqueMandateReferenceNumber())) {
                     stub.putStringState(mandate.getUniqueMandateReferenceNumber(), mandate.toJSONString());
                     stub.setEvent(ContractEvents.MANDATE_CREATED.getValue(), mandate.toJSONString().getBytes(UTF_8));
+                    System.out.println("After putting string and setting event");
+                } else {
+                    System.out.println("In Mandate Already Exists ");
+                    throw new ChaincodeException("Mandate Already Exists", MandateErrors.MANDATE_ALREADY_EXISTS.toString());
                 }
             } catch (Exception e) {
                 mandate.setType(MandateType.NOT_CREATED);
                 stub.setEvent(ContractEvents.MANDATE_CREATION_FAILED.getValue(), mandate.toJSONString().getBytes(UTF_8));
+                System.out.println("After putting string and setting event in exception");
             }
-            mandateCreatedArray.add(mandate);
+            mandateCreatedList.add(mandate.toJSONString());
         }
-        return mandateCreatedArray;
+        return MandateUtils.convertStringListToConcatenatedString(mandateCreatedList);
 
     }
 
