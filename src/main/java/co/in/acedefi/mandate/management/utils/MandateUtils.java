@@ -1,6 +1,8 @@
 package co.in.acedefi.mandate.management.utils;
 
+import java.util.ArrayList;
 import java.util.List;
+
 
 public final class MandateUtils {
 
@@ -32,6 +34,22 @@ public final class MandateUtils {
     public static boolean longIsNullOrZero(final Long number) {
         return number == null || number == 0;
       }
+
+    public static List<String> convertStringToList(final String jsonString) {
+        List<String> jsonStringList = new ArrayList<>();
+        // Remove the outer square brackets
+        String jsonStringWithoutBrackets = jsonString.substring(1, jsonString.length() - 1);
+
+        // Split the string using comma as the delimiter
+        String[] jsonObjects = jsonStringWithoutBrackets.split(",(?=\\{)");
+
+        for (String jsonObjectString : jsonObjects) {
+            jsonObjectString = jsonObjectString + "}";
+            jsonStringList.add(jsonObjectString);
+        }
+
+        return jsonStringList;
+    }
 
 
 }

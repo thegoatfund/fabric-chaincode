@@ -339,19 +339,21 @@ public class MandateProcessor implements ContractInterface {
  */
 
     @Transaction(intent = Transaction.TYPE.SUBMIT)
-    public List<Mandate> batchCreateMandate(final Context ctx, final List<String> mandateJsonArray) {
+    public List<Mandate> batchCreateMandate(final Context ctx, final String mandateJsonArray) {
 
-
-        if (MandateUtils.stringinListIsNullOrEmpty(mandateJsonArray)) {
+        System.out.println("Inside Mandate Function" + mandateJsonArray);
+        if (MandateUtils.stringIsNullOrEmpty(mandateJsonArray)) {
             throw new ChaincodeException(printErrorString("Mandate cant be null or empty ",
                 new Object()), MandateErrors.INVALID_MANDATE.toString());
         }
 
         List<Mandate> mandateCreatedArray = new ArrayList<Mandate>();
         ChaincodeStub stub = ctx.getStub();
-        for (String mandateJson : mandateJsonArray) {
+        for (String mandateJson : MandateUtils.convertStringToList(mandateJsonArray)) {
+            System.out.println("Inside for loop before mandate creation" + mandateJson);
             Mandate mandate = Mandate.fromJSONString(mandateJson);
-
+        // for (Mandate mandate : mandateJsonArray) {
+            System.out.println("Inside for loop");
             try {
                 if (validateMandateData(mandate)) {
                     stub.putStringState(mandate.getUniqueMandateReferenceNumber(), mandate.toJSONString());
